@@ -10,23 +10,18 @@ import {
   labelMessages,
 } from './gmail'
 
-const BATCH = 50
-
 async function applyAction(
   gmail: ReturnType<typeof getGmailClient>,
   ids: string[],
   rule: Rule
 ): Promise<void> {
-  for (let i = 0; i < ids.length; i += BATCH) {
-    const chunk = ids.slice(i, i + BATCH)
-    switch (rule.action) {
-      case 'trash':    await trashMessages(gmail, chunk);    break
-      case 'archive':  await archiveMessages(gmail, chunk);  break
-      case 'markRead': await markReadMessages(gmail, chunk); break
-      case 'label':
-        if (rule.labelName) await labelMessages(gmail, chunk, rule.labelName)
-        break
-    }
+  switch (rule.action) {
+    case 'trash':    await trashMessages(gmail, ids);    break
+    case 'archive':  await archiveMessages(gmail, ids);  break
+    case 'markRead': await markReadMessages(gmail, ids); break
+    case 'label':
+      if (rule.labelName) await labelMessages(gmail, ids, rule.labelName)
+      break
   }
 }
 

@@ -15,6 +15,21 @@ export function getGmailClient(auth: OAuth2Client) {
 
 type GmailClient = ReturnType<typeof getGmailClient>
 
+// Run promises in small concurrent batches to avoid rate limits
+async function inBatches<T>(
+  items: string[],
+  batchSize: number,
+  fn: (id: string) => Promise<T>
+): Promise<T[]> {
+  const results: T[] = []
+  for (let i = 0; i < items.length; i += batchSize) {
+    const chunk = items.slice(i, i + batchSize)
+    const batch = await Promise.all(chunk.map(fn))
+    results.push(...batch)
+  }
+  return results
+}
+
 export async function searchMessageIds(gmail: GmailClient, query: string): Promise<string[]> {
   const ids: string[] = []
   let pageToken: string | undefined
@@ -35,32 +50,30 @@ export async function searchMessageIds(gmail: GmailClient, query: string): Promi
   return ids
 }
 
+// Trash has no batch API — use low concurrency (5 at a time)
 export async function trashMessages(gmail: GmailClient, ids: string[]): Promise<void> {
-  await Promise.all(ids.map(id => gmail.users.messages.trash({ userId: 'me', id })))
+  await inBatches(ids, 5, id => gmail.users.messages.trash({ userId: 'me', id }))
 }
 
+// batchModify handles up to 1000 messages per request — much more efficient
 export async function archiveMessages(gmail: GmailClient, ids: string[]): Promise<void> {
-  await Promise.all(
-    ids.map(id =>
-      gmail.users.messages.modify({
-        userId: 'me',
-        id,
-        requestBody: { removeLabelIds: ['INBOX'] },
-      })
-    )
-  )
+  const BATCH = 1000
+  for (let i = 0; i < ids.length; i += BATCH) {
+    await gmail.users.messages.batchModify({
+      userId: 'me',
+      requestBody: { ids: ids.slice(i, i + BATCH), removeLabelIds: ['INBOX'] },
+    })
+  }
 }
 
 export async function markReadMessages(gmail: GmailClient, ids: string[]): Promise<void> {
-  await Promise.all(
-    ids.map(id =>
-      gmail.users.messages.modify({
-        userId: 'me',
-        id,
-        requestBody: { removeLabelIds: ['UNREAD'] },
-      })
-    )
-  )
+  const BATCH = 1000
+  for (let i = 0; i < ids.length; i += BATCH) {
+    await gmail.users.messages.batchModify({
+      userId: 'me',
+      requestBody: { ids: ids.slice(i, i + BATCH), removeLabelIds: ['UNREAD'] },
+    })
+  }
 }
 
 export async function labelMessages(
@@ -78,13 +91,11 @@ export async function labelMessages(
     })
   ).data.id!
 
-  await Promise.all(
-    ids.map(id =>
-      gmail.users.messages.modify({
-        userId: 'me',
-        id,
-        requestBody: { addLabelIds: [labelId] },
-      })
-    )
-  )
+  const BATCH = 1000
+  for (let i = 0; i < ids.length; i += BATCH) {
+    await gmail.users.messages.batchModify({
+      userId: 'me',
+      requestBody: { ids: ids.slice(i, i + BATCH), addLabelIds: [labelId] },
+    })
+  }
 }

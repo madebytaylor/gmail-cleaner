@@ -46,8 +46,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ senders: [], nextPageToken: null, total: 0 })
   }
 
-  // 2. Batch-fetch From + Subject headers (50 at a time in parallel)
-  const CHUNK = 50
+  // 2. Batch-fetch From + Subject headers (10 at a time to avoid rate limits)
+  const CHUNK = 10
   const metaMap = new Map<string, { from: string; subject: string }>()
 
   for (let i = 0; i < messages.length; i += CHUNK) {
