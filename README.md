@@ -2,7 +2,7 @@
 
 A full-stack web app that automates Gmail organization through user-defined rules. Sign in with Google, define rules as Gmail search queries paired with actions (trash, archive, label, mark read), and a daily cron job handles the rest.
 
-**Live demo:** _add your Vercel URL here_
+**Live demo:** https://gmail-cleaner-puce.vercel.app/
 
 ---
 
