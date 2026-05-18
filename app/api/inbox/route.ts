@@ -73,7 +73,7 @@ export async function GET(req: Request) {
   // 3. Group by sender email
   const groups = new Map<string, SenderGroup>()
 
-  for (const [id, meta] of metaMap) {
+  metaMap.forEach((meta, id) => {
     const { name, email } = parseFrom(meta.from)
     const existing = groups.get(email)
     if (existing) {
@@ -89,7 +89,7 @@ export async function GET(req: Request) {
         sample: [meta.subject],
       })
     }
-  }
+  })
 
   // 4. Sort by count descending
   const senders = Array.from(groups.values()).sort((a, b) => b.count - a.count)
