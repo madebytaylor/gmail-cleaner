@@ -23,6 +23,7 @@ export function InboxCleaner({ onCreateRule }: { onCreateRule: (email: string) =
   const [nextPageToken, setNextPageToken] = useState<string | null>(null)
   const [total, setTotal] = useState<number | null>(null)
   const [scanning, setScanning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [actionStates, setActionStates] = useState<Record<string, ActionState>>({})
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
@@ -30,14 +31,20 @@ export function InboxCleaner({ onCreateRule }: { onCreateRule: (email: string) =
 
   async function scan(pageToken?: string) {
     setScanning(true)
+    setError(null)
     try {
       const url = pageToken ? `/api/inbox?pageToken=${pageToken}` : '/api/inbox'
       const res = await fetch(url)
-      const data: ScanResult = await res.json()
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? `Error ${res.status}`)
+        return
+      }
+      const result = data as ScanResult
 
       setSenders(prev => {
         const map = new Map(prev.map(s => [s.email, s]))
-        for (const s of data.senders) {
+        for (const s of result.senders) {
           const ex = map.get(s.email)
           if (ex) {
             ex.count += s.count
@@ -50,9 +57,9 @@ export function InboxCleaner({ onCreateRule }: { onCreateRule: (email: string) =
         return Array.from(map.values()).sort((a, b) => b.count - a.count)
       })
 
-      setNextPageToken(data.nextPageToken)
-      setTotal(data.total)
-      setScanned(prev => prev + data.senders.reduce((s, g) => s + g.count, 0))
+      setNextPageToken(result.nextPageToken)
+      setTotal(result.total)
+      setScanned(prev => prev + result.senders.reduce((s, g) => s + g.count, 0))
     } finally {
       setScanning(false)
     }
@@ -84,6 +91,16 @@ export function InboxCleaner({ onCreateRule }: { onCreateRule: (email: string) =
 
   return (
     <div className="space-y-6">
+
+      {/* Error banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+          <strong>Scan failed:</strong> {error}
+          {error === 'Unauthorized' && (
+            <span> — try signing out and signing back in to refresh your Google token.</span>
+          )}
+        </div>
+      )}
 
       {/* Intro + scan button */}
       {senders.length === 0 ? (
