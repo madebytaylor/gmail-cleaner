@@ -6,13 +6,16 @@ import type { Rule, RunLog } from '@/types'
 import { RuleCard } from './RuleCard'
 import { RuleModal } from './RuleModal'
 import { RunHistory } from './RunHistory'
+import { InboxCleaner } from './InboxCleaner'
 
 export function Dashboard() {
   const { data: session } = useSession()
+  const [tab, setTab] = useState<'rules' | 'cleaner'>('rules')
   const [rules, setRules] = useState<Rule[]>([])
   const [logs, setLogs] = useState<RunLog[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<Rule | null>(null)
+  const [prefillFrom, setPrefillFrom] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -80,10 +83,17 @@ export function Dashboard() {
   const enabledCount = rules.filter(r => r.enabled).length
   const lastRun = logs[0]
 
+  function handleCreateRuleFromSender(email: string) {
+    setPrefillFrom(email)
+    setEditingRule(null)
+    setModalOpen(true)
+    setTab('rules')
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Gmail Cleaner</h1>
           <p className="text-sm text-slate-500 mt-0.5">{session?.user?.email}</p>
@@ -96,65 +106,84 @@ export function Dashboard() {
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <Stat label="Rules" value={rules.length} />
-        <Stat label="Active" value={enabledCount} />
-        <Stat
-          label="Last run"
-          value={lastRun ? new Date(lastRun.timestamp).toLocaleDateString() : '—'}
-        />
+      {/* Tabs */}
+      <div className="flex gap-1 bg-slate-100 rounded-lg p-1 mb-6">
+        <TabButton active={tab === 'rules'} onClick={() => setTab('rules')}>
+          ⚙️ Rules
+        </TabButton>
+        <TabButton active={tab === 'cleaner'} onClick={() => setTab('cleaner')}>
+          🧹 Bulk Cleaner
+        </TabButton>
       </div>
 
-      {/* Rules section */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-800">Rules</h2>
-          <div className="flex gap-2">
-            <button
-              onClick={handleRunNow}
-              disabled={running || enabledCount === 0}
-              className="px-3 py-1.5 text-sm bg-slate-800 text-white rounded-md hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {running ? 'Running…' : 'Run now'}
-            </button>
-            <button
-              onClick={() => { setEditingRule(null); setModalOpen(true) }}
-              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-500 transition-colors"
-            >
-              + Add rule
-            </button>
+      {tab === 'rules' && (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <Stat label="Rules" value={rules.length} />
+            <Stat label="Active" value={enabledCount} />
+            <Stat
+              label="Last run"
+              value={lastRun ? new Date(lastRun.timestamp).toLocaleDateString() : '—'}
+            />
           </div>
-        </div>
 
-        {loading ? (
-          <p className="text-slate-400 text-sm">Loading…</p>
-        ) : rules.length === 0 ? (
-          <EmptyRules onAdd={() => setModalOpen(true)} />
-        ) : (
-          <div className="space-y-3">
-            {rules.map(rule => (
-              <RuleCard
-                key={rule.id}
-                rule={rule}
-                onToggle={() => handleToggle(rule)}
-                onEdit={() => { setEditingRule(rule); setModalOpen(true) }}
-                onDelete={() => handleDelete(rule.id)}
-              />
-            ))}
+          {/* Rules section */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-800">Rules</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRunNow}
+                  disabled={running || enabledCount === 0}
+                  className="px-3 py-1.5 text-sm bg-slate-800 text-white rounded-md hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {running ? 'Running…' : 'Run now'}
+                </button>
+                <button
+                  onClick={() => { setEditingRule(null); setPrefillFrom(null); setModalOpen(true) }}
+                  className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-500 transition-colors"
+                >
+                  + Add rule
+                </button>
+              </div>
+            </div>
+
+            {loading ? (
+              <p className="text-slate-400 text-sm">Loading…</p>
+            ) : rules.length === 0 ? (
+              <EmptyRules onAdd={() => setModalOpen(true)} />
+            ) : (
+              <div className="space-y-3">
+                {rules.map(rule => (
+                  <RuleCard
+                    key={rule.id}
+                    rule={rule}
+                    onToggle={() => handleToggle(rule)}
+                    onEdit={() => { setEditingRule(rule); setModalOpen(true) }}
+                    onDelete={() => handleDelete(rule.id)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Run history */}
-      {logs.length > 0 && <RunHistory logs={logs} />}
+          {/* Run history */}
+          {logs.length > 0 && <RunHistory logs={logs} />}
+        </>
+      )}
+
+      {tab === 'cleaner' && (
+        <InboxCleaner onCreateRule={handleCreateRuleFromSender} />
+      )}
 
       {/* Modal */}
       {modalOpen && (
         <RuleModal
           rule={editingRule}
+          prefillFrom={prefillFrom ?? undefined}
           onSave={handleSave}
-          onClose={() => { setModalOpen(false); setEditingRule(null) }}
+          onClose={() => { setModalOpen(false); setEditingRule(null); setPrefillFrom(null) }}
         />
       )}
     </div>
@@ -167,6 +196,19 @@ function Stat({ label, value }: { label: string; value: string | number }) {
       <p className="text-xs text-slate-500 uppercase tracking-wide">{label}</p>
       <p className="text-2xl font-semibold text-slate-900 mt-1">{value}</p>
     </div>
+  )
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+        active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+      }`}
+    >
+      {children}
+    </button>
   )
 }
 

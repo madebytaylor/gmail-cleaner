@@ -79,6 +79,7 @@ function parseQuery(query: string): Partial<FormFields> {
 
 interface Props {
   rule: Rule | null
+  prefillFrom?: string
   onSave: (data: NewRule) => void
   onClose: () => void
 }
@@ -88,12 +89,13 @@ const DEFAULT_FIELDS: FormFields = {
   action: 'trash', labelName: '', enabled: true,
 }
 
-export function RuleModal({ rule, onSave, onClose }: Props) {
+export function RuleModal({ rule, prefillFrom, onSave, onClose }: Props) {
   const parsed = rule ? parseQuery(rule.query) : {}
 
   const [fields, setFields] = useState<FormFields>({
     ...DEFAULT_FIELDS,
     ...parsed,
+    from:      prefillFrom ?? parsed.from ?? '',
     action:    rule?.action    ?? 'trash',
     labelName: rule?.labelName ?? '',
     enabled:   rule?.enabled   ?? true,
